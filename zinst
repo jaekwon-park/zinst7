@@ -1057,6 +1057,16 @@ zinst set | awk 'NR>1{print "Package setting",$1}' >> $Save_Dir/$Naming
 	fi
 }
 
+Show_Package_dependecy ()
+{
+
+echo $(zinst ls | awk '{print "Package install",$4".zinst"}' )
+echo "- - - " 
+echo $(zinst set | awk 'NR>1{print "Package setting",$1}' )
+
+}
+
+
 Pkg_Install(){
 	CounterAll=1
 	while [[ $CounterAll -le $ProcessPkgNum ]]
@@ -2730,6 +2740,8 @@ sudo mkdir -p $CurrPkgDiR
 		Up_Virtual ;;
 	halt)
 		Halt_Virtual ;;
+        show_dep)
+		Show_Package_dependecy ;;
 	*)
 		Help_Command	;;
 	esac
