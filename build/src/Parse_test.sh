@@ -1,78 +1,108 @@
 #!/bin/bash
 
-
 #########################################################3
- 
-while getopts ":dsofzdelF:u:S:O:p:P:h:H:" opt; do
-  case $opt in
-    d)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    s)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    o)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    f)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    z)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    d)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    e)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    l)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    F)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    u)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-      ;;
-    S)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-	SetOptionValueE=$(echo $OPTARG | sed -e 's/#/ /g')
 
+PARSED_OPTION=$(getopt -n "$0" -o :dsofzelF:u:S:O:p:P:h:H: --long "downgrade,stable,oldset,force,zicf,edit,list,file:,url:,set:,export:,pass:,port:,host:,hostlist:" -- "$@")
+if [ $? -ne 0 ]
+then
+	echo "invaild option "
+        exit 1
+fi
+eval set -- "$PARSED_OPTION"
+echo $0" Argument Reparsed [ "$PARSED_OPTION " ]"
+
+while true;
+do
+    case $1 in
+    -d|--downgrade)
+      echo $1" was triggered "
+	echo "downgrade on"
+      shift
       ;;
-    O)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
+    -s|--stable)
+      echo $1" was triggered "
+	echo "stable on"
+      shift
       ;;
-    p)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
+    -o|--oldset)
+      echo $1" was triggered "
+	echo "oldset on"
+      shift
       ;;
-    P)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
+    -f|--force)
+      echo $1" was triggered "
+        echo "force on"
+      shift
       ;;
-    h)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
-	Hostlist=$(echo $OPTARG | sed -e 's/,/ /g')
+    -z|--zicf)
+      echo $1" was triggered "
+        echo "zicf on"
+      shift
+      ;;
+    -e|--edit)
+      echo $1" was triggered "
+	echo "edit on"
+      shift
+      ;;
+    -l|--list)
+      echo $1" was triggered "
+        echo "list on"
+      shift
+      ;;
+    -F|--file)
+      echo $1" was triggered, Parameter: "$2 >&2
+	echo "file on"
+      shift 2
+      ;;
+    -u|--url)
+      echo $1" was triggered, Parameter: "$2 >&2
+	echo "url on"
+      shift 2
+      ;;
+    -S|--set)
+      echo $1" was triggered, Parameter: "$2 >&2
+      SetOptionValue=$(echo $2 | sed -e 's/#/ /g')
+	echo "set on"
+      shift 2
+      ;;
+    -O|--export)
+      echo $1" was triggered, Parameter: "$2 >&2
+	echo "export on"
+      shift 2
+      ;;
+    -p|--pass)
+      echo $1" was triggered, Parameter: "$2 >&2
+	echo "pass on"
+      shift 2
+      ;;
+    -P|--port)
+      echo $1" was triggered, Parameter: "$2 >&2
+	echo "port on"
+      shift 2
+      ;;
+    -h|--host)
+      echo $1" was triggered, Parameter: "$2 >&2
+	Hostlist=$(echo $2 | sed -e 's/,/ /g')
 	HostCount=0
 	for i in $Hostlist
 	do
 		let HostCount=$HostCount+1
 	done
+	echo "host on"
+        shift 2
       ;;
-    H)
-      echo $opt" was triggered, Parameter: "$OPTARG >&2
+    -H|--hostlist)
+      echo $1" was triggered, Parameter: "$2 >&2
+	echo "hostlist on"
+      shift 2
       ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      exit 1
-      ;;
-    :)
-      echo "Option -$OPTARG requires an argument." >&2
-      exit 1
-      ;;
+    --)
+      shift
+      break
+    ;;
   esac
 done
 
-shift $(( $OPTIND  -1 ))
 command=$1
 shift 
 echo $@
@@ -321,130 +351,134 @@ IPAddress_Check () {
 case "$command" in
 	i | inst*)
 		#Pkg_Install $* 	
-		echo $command" argument is "$@
+		echo "command [ install ] package is "$@
 		echo $ProcessPkgNum
 		echo $Hostlist
 		echo $HostCount
-		echo $SetOptionValueE
+		echo $SetOptionValue
 	;;
 	set)
 		#Pkg_Set $*
-		echo $command" argument is "$@
+		echo "command [ set ] argument is "$@
+		echo $ProcessPkgNum
+		echo $Hostlist
+		echo $HostCount
+		echo $SetOptionValue
 	;;
 	gets*)
 		#Pkg_Getset $*
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	getd*)
 		#Pkg_GetDep $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	r*m*)
 		#Pkg_Remove $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	start)
 		#Daemon_Control $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	stop)
 		#Daemon_Control $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	run)
 		#Daemon_Control $*
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	reload)
 		#Daemon_Control $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	restart)
 		#Daemon_Control $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	on)
 		#Daemon_Control $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	off)
 		#Daemon_Control $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	his*)
 		#History
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	self-up*)
 		#Zinst_Selfupdate 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	self-conf*)
 		#Zinst_SelfConfig
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	cront*)
 		#Cront_Command $* 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	l*s*)
 		#Pkg_List $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	sync*)
 		#Pkg_Sync $*	
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	restore)
 		#Pkg_Restore $*
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	find)
 		#Pkg_Find $*
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	track)
 		#Pkg_Track $* 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	daemon*)
 		#Daemon_list $2
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	-v*)
 		#Zinst_Version 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	*help)
 		Help_Detail	
 	;;
 	init)
 		#Init_Virtual 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	vms)
 		#Vmlist_Virtual 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	add)
 		#Add_Virtual 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	destroy)
 		#Destroy_Virtual 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	up)
 		#Up_Virtual 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	halt)
 		#Halt_Virtual
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
         show_dep)
 		#Show_Package_dependecy 
-		echo $command" argument is "$@
+		echo "command ["$command"] argument is "$@
 	;;
 	*)
 		Help_Command	
