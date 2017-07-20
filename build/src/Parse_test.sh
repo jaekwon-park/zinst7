@@ -659,8 +659,8 @@ $sudo_base chgrp $zinst_group $History_LOG 2> $zinst_log
 exception_check
 
 Package_Parse_Check(){
-### Package name check
-Parse_Checker=$*
+	### Package name check
+	Parse_Checker=$*
         ParsedPkgVerChk=$(echo "$Parse_Checker" | egrep "\-[0-9.*]*.zinst\$")
         if [[ $ParsedPkgVerChk != "" ]]
         then
@@ -696,7 +696,8 @@ Parse_Checker=$*
                         fi
                 else
                         Parse_Result=$(zinst find "^$Parse_Checker-" | tail -1)
-                        if [[ $Parse_Result = "" ]];then
+                        if [[ $Parse_Result = "" ]]
+			then
                                 PkgCheckArry=$PkgCheckArry" "$Parse_Result
                                 printf "%-59s %-1s %-10s %-1s\n" "| $Parse_Checker" "|" "Not existed" "|"
                                 exit 0
@@ -719,271 +720,42 @@ PrintCheck(){
 }
 
 
-### Multi file copier command
-	if [[ $CommandX = "mcp" ]] 
-	then
-		if [[ $ZHosts != "" ]]
-		then
-			TargetDir=$(echo $ZPackages | awk '{print $NF}')
-			Source=$(echo $ZPackages | awk '{for (i=1;i<NF;i=i+1) print $i}')
-			SourceNum=$(echo $Source | awk '{print NF}' )
-			HostNum=$(echo $ZHosts | awk '{print NF}')
-			Hcount=1
-				while [[ $Hcount -le $HostNum ]]
-				do
-					TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
-					echo ""
-					echo "[:: $TartgetHost  ::]"
-					Scount=1
-						while [[ $Scount -le $SourceNum ]];	do
-							PartedSource=`echo $Source |awk '{print $'$Scount'}'`
-							Check_Files=`ls $PartedSource`
-								if [[ $Check_Files != $PartedSource  ]]
-								then
-									echo " =============  $PartedSource File not exist ============="
-									exit 0;
-								fi
-							$Comm_sshpass scp -P $ssh_port $PartedSource $TartgetHost:$TargetDir
-							let Scount=Scount+1
-						done
-					let Hcount=Hcount+1
-					Localhost=$HOSTNAME
-					Command_p="> mcp"
-					SourceFull=(`echo "$Source"`)
-					IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
-					$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $TartgetHost "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - From $IPaddr:  ${SourceFull[@]} -> $TargetDir \" >> $History_LOG"
-				done
-		else
-			echo "$ROWW"
-			echo " Hostname requires"
-			echo "$ROWW"
-		fi
-		exit 0;
-	fi
-
-	CheckRB=`echo "$CommandX" |grep "sync"`
-	if [[ $CheckRB != "" ]]; then
-		if [[ $ZHosts != "" ]]; then
-			TargetDir="~/"
-			Source=`echo $ZPackages | awk '{print $1}'`
-			HostNum=`echo $ZHosts | awk '{print NF}'`
-			Hcount=1
-				while [[ $Hcount -le $HostNum ]];do
-					TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
-					echo ""
-					echo "[:: $TartgetHost ::]"
-					Scount=1
-					$Comm_sshpass scp -P $ssh_port $ZPackages $TartgetHost:~/ 2> $zinst_log
-					let Hcount=Hcount+1
-					Localhost=$HOSTNAME
-					Command_p="> Sent a sync file"
-					SourceFull=(`echo "$Source"`)
-					IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
-					$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $TartgetHost "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - From $IPaddr:  $SourceFull -> $TargetDir \" >> $History_LOG"
-				done
-		fi
-	fi
-
-
-## Function for ssh key deply to the servers
-    if [[ $CommandX = keydep* ]]; then
-        if [[ $ZHosts != "" ]]; then
-            TargetDir=`echo $ZPackages | awk '{print $NF}'`
-            Source=`echo $ZPackages | awk '{for (i=1;i<NF;i=i+1) print $i}'`
-            HostNum=`echo $ZHosts | awk '{print NF}'`
-			UserID=`whoami`
-			#AuthKey="$ZinstBaseRoot/var/authorized_keys"
-				if [[ $UserID = "root" ]];then
-					AuthKey="/root/authorized_keys"
-				else
-					AuthKey="/home/$UserID/authorized_keys"
-				fi
-				if [[ ! -f $AuthKey ]]; then
-				    sudo touch $AuthKey
-				fi
-			PUBKEY=`cat $AuthKey 2> /dev/null`
-				if [[ $PUBKEY = "" ]];then
-				    echo $Barr
-				    echo " Please insert a public key to $AuthKey !!!"
-                	echo $Barr
-				    exit 0
-				fi
-				if [[ `(zinst ls sshpass)` = "" ]];then
-					zinst i sshpass -stable
-				fi
-            Hcount=1
-                while [[ $Hcount -le $HostNum ]];  do
-                    TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
-                    echo ""
-                    echo "[:: $TartgetHost  ::]"
-					TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
-					$Comm_sshpass ssh -p $ssh_port -T -oStrictHostKeyChecking=no $UserID@$TartgetHost <<EOF1
-						if [ ! -e "~/.ssh" ]; then
-							mkdir ~/.ssh  2> /dev/null
-						fi
-						umask 022
-						echo "$PUBKEY" > ~/.ssh/authorized_keys
-EOF1
-					let Hcount=Hcount+1
-					Localhost=$HOSTNAME
-					Command_p="> Key Deploy"
-					SourceFull=(`echo "$Source"`)
-					IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
-					$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $TartgetHost "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - From $IPaddr:  ${SourceFull[@]} -> $TargetDir \" >> $History_LOG"
-				done
-		else
-			echo "$ROWW"
-			echo " Hostname requires"
-			echo "$ROWW"
-		fi
-		exit 0;
-	fi
-
-
-#########################################################################################
-############################# zinst re-org engine start #################################
-################################# Hostlist checker ######################################
-RotaCommand=$Allcommand
-szinst="zinst"
-RotaBeacon=0
-	if [[ $ZHosts != "" ]]
-	then
-		Count=0
-		Max=${#HostChanged[@]}
-			while [[ $Count -lt $Max ]];
-			do
-				HostF=$WhoStamp@${HostChanged[$Count]}
-				## ssh connection check
-				$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $HostF "grep ^VERSION /usr/bin/zinst" > $ZinstBaseRoot/vault/Source/ssh_conn_test.log 2>&1
-				CheckConnection=`$sudo_base cat $ZinstBaseRoot/vault/Source/ssh_conn_test.log |grep "No route\|not known\|Connection refused"`
-					if [[ $CheckConnection != "" ]]
-					then
-						echo $Barr
-						echo "It couldn't connect this host($HostF). Please check this hostname"
-						echo $Barr
-					else
-						## Install start with target host ##
-						## Check the Package or Distribution server
-						## Package scp to destination
-						zinst_checkDes=`$sudo_base grep ^VERSION $ZinstBaseRoot/vault/Source/ssh_conn_test.log | sed -e 's/VERSION=//g' 2> $zinst_log`
-							if [[ $zinst_checkDes != "" ]]
-							then
-								zinst_checkLoc=`$sudo_base cat /usr/bin/zinst 2> $zinst_log |grep ^VERSION | sed -e 's/VERSION=//g'`
-									if [[ $(version_redefine "$zinst_checkDes") < $(version_redefine "$zinst_checkLoc") ]];
-									then
-										$Comm_sshpass scp -P $ssh_port /usr/bin/zinst $HostF:/usr/bin
-									fi
-							else
-								$Comm_sshpass scp -P $ssh_port /usr/bin/zinst $HostF:/usr/bin/ 2> $zinst_log
-							fi
-
-						#### Check SSH command ########
-							if [[ $CommandX = "ssh" ]]
-							then
-								RotaCommand=$MidPackageArry
-								szinst=""
-							fi
-
-						CheckDesDIR=`$sudo_base grep " cannot access " $ZinstBaseRoot/vault/Source/ssh_conn_test.log`
-							if [[ $CommandX != "" ]]
-							then
-	        						$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "$sudo_base mkdir -p $ZinstBaseRoot/vault/Source;sudo chgrp -R $zinst_group $ZinstBaseRoot/vault" 2> $zinst_log
-							fi
-
-        					echo ""
-						## Delete temporary connection checker file
-     						$sudo_base rm -f $ZinstBaseRoot/vault/Source/ssh_conn_test.log
-						#### Local package scp to destination ####
-						LocalPkg=`echo $RotaCommand | sed -e 's/^[a-z]* //g'`
-						LocalPkg_Num=`echo $LocalPkg | awk '{print NF}'`
-
-						CountSub=1
-							while [[ $CountSub -le $LocalPkg_Num ]]
-							do
-								LocalRealPkg=`echo $LocalPkg | awk '{print $'$CountSub'}'`
-									if [[ $CommandX = "^ssh$" ]]
-									then
-										LocalPkg_chk=`cd $PWD;ls |grep "^$LocalRealPkg"`
-									fi
-
-									if [[ $LocalPkg_chk != "" ]]
-									then
-										$Comm_sshpass scp -P $ssh_port $LocalRealPkg $HostF:$ZinstSourceDir/
-									fi
-
-								let CountSub=CountSub+1
-							done;
-
-							#### Check set command for destination work ########
-							if [[ $RotaBeacon = 0 ]];then
-								if [[ $CommandX = "set" ]]
-								then
-									RotaCommand=`echo $RotaCommand | sed -e 's/ \-set//1'`
-									RotaBeacon=1
-								fi
-							fi
-
-						MultiCheck=`echo $ZOptions |grep -e "-multi"`
-							if [[ $MultiCheck = "" ]]
-							then
-								$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "echo [ :: $HostF :: ];cd $ZinstSourceDir; source /etc/profile ;$szinst $RotaCommand" 2> $zinst_log
-								IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
-									if [[ $szinst = "" ]];then
-										DestStamp="> SSH -"
-									else
-										DestStamp=" L"
-									fi
-
- 							    $Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $DestStamp From $IPaddr: $szinst $RotaCommand\" >> $History_LOG"
-							else
-								$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "echo [ :: $HostF :: ];cd $ZinstSourceDir; source /etc/profile ;$szinst $RotaCommand" &
-							fi
-
-					fi
-				let Count=Count+1
-			done
-		exit 0;
-	fi
-
-
-
-
-
-
-
-
-
-
 Package_Array_Sort(){
-BoxPkg=$ZPackages
-BoxPkgArry=( $BoxPkg )
+	BoxPkg=$ZPackages
+	BoxPkgArry=( $BoxPkg )
 
-CurrPkgList="$ZinstBaseRoot/vault/Source/.current_package.list"
+	CurrPkgList="$ZinstBaseRoot/vault/Source/.current_package.list"
 
-StockPkg="/tmp/stockpkg"
-touch $StockPkg
+	StockPkg="/tmp/stockpkg"
+	touch $StockPkg
 
-### Package list up
-zinst find  > $CurrPkgList
-sudo mkdir -p $CurrPkgDiR
+	### Package list up
+	zinst find  > $CurrPkgList
+	exception_check
+	sudo mkdir -p $CurrPkgDiR
+	exception_check
 	### Loop for each package sort
 	BoxCounter=0
-	while [ $BoxCounter -lt ${#BoxPkgArry[@]} ]
+#	while [ $BoxCounter -lt ${##BoxPkgArry[@]} ]
+	for i in $BoxPkg
 	do
-		Package_Parse_Check ${BoxPkgArry[$BoxCounter]}
-		BoxPkgArry[$BoxCounter]=$Parse_Result
+		#Package_Parse_Check ${BoxPkgArry[$BoxCounter]}
+		Package_Parse_Check $i
+		#BoxPkgArry[$BoxCounter]=$Parse_Result
+		$i=$Parse_Result
 		PrintCheck $Parse_Result
 		#### Start here for fetch the information
 		### Dependency check by zicf file from distribution server
-			IndexFileChk=`ls $CurrPkgDiR/${BoxPkgArry[$BoxCounter]}.zicf 2> $zinst_log`
+			#IndexFileChk=$(ls $CurrPkgDiR/${BoxPkgArry[$BoxCounter]}.zicf 2> $zinst_log)
+			IndexFileChk=$(ls $CurrPkgDiR/$i.zicf 2> $zinst_log)
 			if [[ $IndexFileChk = "" ]]
 			then
-				$sudo_base bash -c "curl -sL \"$Dist_URL/checker/${BoxPkgArry[$BoxCounter]}.zicf\" -o $CurrPkgDiR/${BoxPkgArry[$BoxCounter]}.zicf 2> $zinst_log "
-				CheckDep=(`cat $CurrPkgDiR/${BoxPkgArry[$BoxCounter]}.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g'`)
+				$sudo_base bash -c "curl -sL \"$Dist_URL/checker/$i.zicf\" -o $CurrPkgDiR/$i.zicf 2> $zinst_log "
+				exception_check
+				CheckDep=$(cat $CurrPkgDiR/$i.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g')
 			else
-				CheckDep=(`cat $CurrPkgDiR/${BoxPkgArry[$BoxCounter]}.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g'`)
+				CheckDep=$(cat $CurrPkgDiR/$i.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g')
 			fi
-
 
 		### Check existed dependency package
 		if [[ ${CheckDep[@]} != ""  ]]
@@ -1009,20 +781,20 @@ sudo mkdir -p $CurrPkgDiR
 				PrintCheck $Parse_Result
 
 				## Check Existed package in line
-				CheckBoxPkg=`echo "${BoxPkgArry[@]}" | grep "${CheckDep[$SubBoxCounter]}" `
+				CheckBoxPkg=$(echo "${BoxPkgArry[@]}" | grep "${CheckDep[$SubBoxCounter]}" )
 
 				## Check Existed package in local
-				CurrCheckBoxPkg=`zinst ls |grep -w \`echo "${CheckDep[$SubBoxCounter]}" | awk -F'-' '{print $1}'\``
-				SubFetchFile=`echo "${CheckDep[$SubBoxCounter]}"`
-
-					SubIndexFileChk=`ls $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log`
-					if [[ $SubIndexFileChk = "" ]]
-					then
-						$sudo_base bash -c "curl -sL \"$Dist_URL/checker/$SubFetchFile.zicf\" -o $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log "
-						SudDepChk=(`cat $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g'`)
-					else
-						SudDepChk=(`cat $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g'`)
-					fi
+				CurrCheckBoxPkg=$(zinst ls |grep -w \`echo "${CheckDep[$SubBoxCounter]}" | awk -F'-' '{print $1}'\`)
+				SubFetchFile=$(echo "${CheckDep[$SubBoxCounter]}")
+				SubIndexFileChk=$(ls $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log)
+				if [[ $SubIndexFileChk = "" ]]
+				then
+					$sudo_base bash -c "curl -sL \"$Dist_URL/checker/$SubFetchFile.zicf\" -o $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log "
+					exception_check
+					SudDepChk=$(cat $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g')
+				else
+					SudDepChk=$(cat $CurrPkgDiR/$SubFetchFile.zicf 2> $zinst_log |grep '^ZINST requires' | sed 's/ZINST requires pkg //g')
+				fi
 
 				### Package version check & define
 				SubCLe=0
@@ -1030,8 +802,8 @@ sudo mkdir -p $CurrPkgDiR
 				do
 					if [[ ${SudDepChk[$SubCLe]} != "" ]]
 					then
-						CurrSubSecPkgChk=`zinst ls -w |grep "${SudDepChk[$SubCLe]}" | awk '{print $4}' `
-						SubSecPkgChk=`echo "${BoxPkgArry[@]}" | grep "${SudDepChk[$SubCLe]}"`
+						CurrSubSecPkgChk=$(zinst ls -w |grep "${SudDepChk[$SubCLe]}" | awk '{print $4}' )
+						SubSecPkgChk=$(echo "${BoxPkgArry[@]}" | grep "${SudDepChk[$SubCLe]}")
 						if [[ $CurrSubSecPkgChk = "" ]]
 						then
 							if [[ $SubSecPkgChk = "" ]]
@@ -1056,18 +828,18 @@ sudo mkdir -p $CurrPkgDiR
 						if [[ $CheckBoxPkg != "" ]]
 						then
 						### Check in-line package include
-						ChkinArry=`echo "$CheckBoxPkg" |grep -w "${CheckDep[$SubBoxCounter]}"`
+						ChkinArry=$(echo "$CheckBoxPkg" |grep -w "${CheckDep[$SubBoxCounter]}")
 							if [[ $ChkinArry != "" ]]; then
-								echo "${CheckDep[$SubBoxCounter]} ${BoxPkgArry[$BoxCounter]}" >> $StockPkg
+								echo ${CheckDep[$SubBoxCounter]}" "${BoxPkgArry[$BoxCounter]} >> $StockPkg
 
 							else
 							### Require package check in local
-							CurrSubSecPkgChk=`zinst ls -w |grep "${CheckDep[$SubBoxCounter]}" | awk '{print $4}' `
+							CurrSubSecPkgChk=$(zinst ls -w |grep "${CheckDep[$SubBoxCounter]}" | awk '{print $4}')
 								if [[ $CurrSubSecPkgChk = "" ]];then
-									echo "$Barr"
+									echo $Barr
 									echo "  Notice: Package requires as below !!!!"
-									echo "   ${CheckDep[$SubBoxCounter]}"
-									echo "$Barr"
+									echo "   "${CheckDep[$SubBoxCounter]}
+									echo $Barr
 									echo ""
 									exit 0;
 								else
@@ -1083,16 +855,16 @@ sudo mkdir -p $CurrPkgDiR
 							exit 0;
 						fi
 					else
-						ChkinArry=`echo " $CheckBoxPkg" |grep " ${CheckDep[$SubBoxCounter]}"`
+						ChkinArry=$(echo " $CheckBoxPkg" |grep " ${CheckDep[$SubBoxCounter]}")
 							if [[ $ChkinArry != "" ]]; then
-								echo "${CheckDep[$SubBoxCounter]} ${BoxPkgArry[$BoxCounter]}" >> $StockPkg
+								echo ${CheckDep[$SubBoxCounter]}" "${BoxPkgArry[$BoxCounter]} >> $StockPkg
 							else
 							CurrSubSecPkgChk=`zinst ls |grep -w "${SudDepChk[$SubCLe]}" | awk '{print $4}' `
 								if [[ $CurrSubSecPkgChk = "" ]];then
-									echo "$Barr"
+									echo $Barr
 									echo "  Notice: Package requires as below"
-									echo "   ${CheckDep[$SubBoxCounter]}"
-									echo "$Barr"
+									echo "   "${CheckDep[$SubBoxCounter]}
+									echo $Barr
 									echo ""
 									exit 0;
 								else
@@ -2672,6 +2444,231 @@ fi
 ### History File reset for permission
 $sudo_base chmod 664 $History_LOG 2> $zinst_log
 $sudo_base chgrp $zinst_group $History_LOG 2> $zinst_log
+
+
+### Multi file copier command
+	if [[ $CommandX = "mcp" ]]; then
+		if [[ $ZHosts != "" ]];	then
+			TargetDir=`echo $ZPackages | awk '{print $NF}'`
+			Source=`echo $ZPackages | awk '{for (i=1;i<NF;i=i+1) print $i}'`
+			SourceNum=`echo $Source | awk '{print NF}' `
+			HostNum=`echo $ZHosts | awk '{print NF}'`
+			Hcount=1
+				while [[ $Hcount -le $HostNum ]]
+				do
+					TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
+					echo ""
+					echo "[:: $TartgetHost  ::]"
+					Scount=1
+						while [[ $Scount -le $SourceNum ]];	do
+							PartedSource=`echo $Source |awk '{print $'$Scount'}'`
+							Check_Files=`ls $PartedSource`
+								if [[ $Check_Files != $PartedSource  ]]
+								then
+									echo " =============  $PartedSource File not exist ============="
+									exit 0;
+								fi
+							$Comm_sshpass scp -P $ssh_port $PartedSource $TartgetHost:$TargetDir
+							let Scount=Scount+1
+						done
+					let Hcount=Hcount+1
+					Localhost=$HOSTNAME
+					Command_p="> mcp"
+					SourceFull=(`echo "$Source"`)
+					IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
+					$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $TartgetHost "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - From $IPaddr:  ${SourceFull[@]} -> $TargetDir \" >> $History_LOG"
+				done
+		else
+			echo "$ROWW"
+			echo " Hostname requires"
+			echo "$ROWW"
+		fi
+		exit 0;
+	fi
+
+	CheckRB=`echo "$CommandX" |grep "sync"`
+	if [[ $CheckRB != "" ]]; then
+		if [[ $ZHosts != "" ]]; then
+			TargetDir="~/"
+			Source=`echo $ZPackages | awk '{print $1}'`
+			HostNum=`echo $ZHosts | awk '{print NF}'`
+			Hcount=1
+				while [[ $Hcount -le $HostNum ]];do
+					TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
+					echo ""
+					echo "[:: $TartgetHost ::]"
+					Scount=1
+					$Comm_sshpass scp -P $ssh_port $ZPackages $TartgetHost:~/ 2> $zinst_log
+					let Hcount=Hcount+1
+					Localhost=$HOSTNAME
+					Command_p="> Sent a sync file"
+					SourceFull=(`echo "$Source"`)
+					IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
+					$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $TartgetHost "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - From $IPaddr:  $SourceFull -> $TargetDir \" >> $History_LOG"
+				done
+		fi
+	fi
+
+
+## Function for ssh key deply to the servers
+    if [[ $CommandX = keydep* ]]; then
+        if [[ $ZHosts != "" ]]; then
+            TargetDir=`echo $ZPackages | awk '{print $NF}'`
+            Source=`echo $ZPackages | awk '{for (i=1;i<NF;i=i+1) print $i}'`
+            HostNum=`echo $ZHosts | awk '{print NF}'`
+			UserID=`whoami`
+			#AuthKey="$ZinstBaseRoot/var/authorized_keys"
+				if [[ $UserID = "root" ]];then
+					AuthKey="/root/authorized_keys"
+				else
+					AuthKey="/home/$UserID/authorized_keys"
+				fi
+				if [[ ! -f $AuthKey ]]; then
+				    sudo touch $AuthKey
+				fi
+			PUBKEY=`cat $AuthKey 2> /dev/null`
+				if [[ $PUBKEY = "" ]];then
+				    echo $Barr
+				    echo " Please insert a public key to $AuthKey !!!"
+                	echo $Barr
+				    exit 0
+				fi
+				if [[ `(zinst ls sshpass)` = "" ]];then
+					zinst i sshpass -stable
+				fi
+            Hcount=1
+                while [[ $Hcount -le $HostNum ]];  do
+                    TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
+                    echo ""
+                    echo "[:: $TartgetHost  ::]"
+					TartgetHost=`echo $ZHosts | awk '{print $'$Hcount'}'`
+					$Comm_sshpass ssh -p $ssh_port -T -oStrictHostKeyChecking=no $UserID@$TartgetHost <<EOF1
+						if [ ! -e "~/.ssh" ]; then
+							mkdir ~/.ssh  2> /dev/null
+						fi
+						umask 022
+						echo "$PUBKEY" > ~/.ssh/authorized_keys
+EOF1
+					let Hcount=Hcount+1
+					Localhost=$HOSTNAME
+					Command_p="> Key Deploy"
+					SourceFull=(`echo "$Source"`)
+					IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
+					$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $TartgetHost "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - From $IPaddr:  ${SourceFull[@]} -> $TargetDir \" >> $History_LOG"
+				done
+		else
+			echo "$ROWW"
+			echo " Hostname requires"
+			echo "$ROWW"
+		fi
+		exit 0;
+	fi
+
+
+#########################################################################################
+############################# zinst re-org engine start #################################
+################################# Hostlist checker ######################################
+RotaCommand=$Allcommand
+szinst="zinst"
+RotaBeacon=0
+	if [[ $ZHosts != "" ]]
+	then
+		Count=0
+		Max=${#HostChanged[@]}
+			while [[ $Count -lt $Max ]];
+			do
+				HostF=$WhoStamp@${HostChanged[$Count]}
+				## ssh connection check
+				$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no $HostF "grep ^VERSION /usr/bin/zinst" > $ZinstBaseRoot/vault/Source/ssh_conn_test.log 2>&1
+				CheckConnection=`$sudo_base cat $ZinstBaseRoot/vault/Source/ssh_conn_test.log |grep "No route\|not known\|Connection refused"`
+					if [[ $CheckConnection != "" ]]
+					then
+						echo $Barr
+						echo "It couldn't connect this host($HostF). Please check this hostname"
+						echo $Barr
+					else
+						## Install start with target host ##
+						## Check the Package or Distribution server
+						## Package scp to destination
+						zinst_checkDes=`$sudo_base grep ^VERSION $ZinstBaseRoot/vault/Source/ssh_conn_test.log | sed -e 's/VERSION=//g' 2> $zinst_log`
+							if [[ $zinst_checkDes != "" ]]
+							then
+								zinst_checkLoc=`$sudo_base cat /usr/bin/zinst 2> $zinst_log |grep ^VERSION | sed -e 's/VERSION=//g'`
+									if [[ $(version_redefine "$zinst_checkDes") < $(version_redefine "$zinst_checkLoc") ]];
+									then
+										$Comm_sshpass scp -P $ssh_port /usr/bin/zinst $HostF:/usr/bin
+									fi
+							else
+								$Comm_sshpass scp -P $ssh_port /usr/bin/zinst $HostF:/usr/bin/ 2> $zinst_log
+							fi
+
+						#### Check SSH command ########
+							if [[ $CommandX = "ssh" ]]
+							then
+								RotaCommand=$MidPackageArry
+								szinst=""
+							fi
+
+						CheckDesDIR=`$sudo_base grep " cannot access " $ZinstBaseRoot/vault/Source/ssh_conn_test.log`
+							if [[ $CommandX != "" ]]
+							then
+	        						$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "$sudo_base mkdir -p $ZinstBaseRoot/vault/Source;sudo chgrp -R $zinst_group $ZinstBaseRoot/vault" 2> $zinst_log
+							fi
+
+        					echo ""
+						## Delete temporary connection checker file
+     						$sudo_base rm -f $ZinstBaseRoot/vault/Source/ssh_conn_test.log
+						#### Local package scp to destination ####
+						LocalPkg=`echo $RotaCommand | sed -e 's/^[a-z]* //g'`
+						LocalPkg_Num=`echo $LocalPkg | awk '{print NF}'`
+
+						CountSub=1
+							while [[ $CountSub -le $LocalPkg_Num ]]
+							do
+								LocalRealPkg=`echo $LocalPkg | awk '{print $'$CountSub'}'`
+									if [[ $CommandX = "^ssh$" ]]
+									then
+										LocalPkg_chk=`cd $PWD;ls |grep "^$LocalRealPkg"`
+									fi
+
+									if [[ $LocalPkg_chk != "" ]]
+									then
+										$Comm_sshpass scp -P $ssh_port $LocalRealPkg $HostF:$ZinstSourceDir/
+									fi
+
+								let CountSub=CountSub+1
+							done;
+
+							#### Check set command for destination work ########
+							if [[ $RotaBeacon = 0 ]];then
+								if [[ $CommandX = "set" ]]
+								then
+									RotaCommand=`echo $RotaCommand | sed -e 's/ \-set//1'`
+									RotaBeacon=1
+								fi
+							fi
+
+						MultiCheck=`echo $ZOptions |grep -e "-multi"`
+							if [[ $MultiCheck = "" ]]
+							then
+								$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "echo [ :: $HostF :: ];cd $ZinstSourceDir; source /etc/profile ;$szinst $RotaCommand" 2> $zinst_log
+								IPaddr=`/sbin/ifconfig |grep " addr:" |grep Bcast |head -1 | awk '{print $2}'|awk  -F ':' '{print $2}'`
+									if [[ $szinst = "" ]];then
+										DestStamp="> SSH -"
+									else
+										DestStamp=" L"
+									fi
+
+ 							    $Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "echo -e \"`date +%Y.%m.%d_%T`\t $WhoStamps : $DestStamp From $IPaddr: $szinst $RotaCommand\" >> $History_LOG"
+							else
+								$Comm_sshpass ssh -p $ssh_port -oStrictHostKeyChecking=no -t $HostF "echo [ :: $HostF :: ];cd $ZinstSourceDir; source /etc/profile ;$szinst $RotaCommand" &
+							fi
+
+					fi
+				let Count=Count+1
+			done
+		exit 0;
+	fi
 
 
 case "$command" in
