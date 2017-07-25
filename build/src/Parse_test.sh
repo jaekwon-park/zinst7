@@ -14,8 +14,8 @@ ROWW="============================================================="
 ### Base information
 ### ------ Config Area ----- 11st line here
 #
-ManagerIP="10.1.240.20"
-Dist_server="http://10.1.240.20"
+ManagerIP="10.1.2.33"
+Dist_server="http://10.1.2.33"
 ZinstBaseRoot="/data"
 ZinstDIRs="$ZinstBaseRoot/zinst"
 ZinstSourceDir="$ZinstBaseRoot/vault/Source"
@@ -46,7 +46,7 @@ Zinst_Locale=en
 ##########################################################
 ################ Parameter Parsing Engine ################
 ##########################################################
-PARSED_OPTION=$(getopt -n "$0" -o :dsofzelF:u:S:O:p:P:h:H: --long "downgrade,stable,oldset,force,zicf,edit,list,file:,url:,set:,export:,pass:,port:,host:,hostlist:" -- "$@")
+PARSED_OPTION=$(getopt -n "$0" -o :dsofzelF:u:S:O:p:P:h:H: --long "same,downgrade,stable,oldset,force,zicf,edit,list,file:,url:,set:,export:,pass:,port:,host:,hostlist:" -- "$@")
 if [ $? -ne 0 ]
 then
 	echo "invaild option "
@@ -61,10 +61,17 @@ SetOptionValue[0]=""
 while true;
 do
     case $1 in
-    -d|--downgrade)
-      echo $1" was triggered "
+    --same)
+	echo $1" was triggered "
 	echo "downgrade on"
-      shift
+	SameOption="--same"
+	shift
+      ;;
+    -d|--downgrade)
+	echo $1" was triggered "
+	echo "downgrade on"
+	DowngradeOption="--downgrade"
+	shift
       ;;
     -s|--stable)
       echo $1" was triggered "
@@ -158,6 +165,7 @@ done
 command=$1
 shift 
 echo $@
+ZPackages=$@
 
 ##############################################################
 ################ Parameter Parsing Engine End ################
@@ -165,7 +173,6 @@ echo $@
 
 ProcessPkgNum=$#
 Zset=${SetOptionValue[@]}
-
 
 function print_locale () {
 case $1 in
@@ -516,32 +523,35 @@ Select_OS(){
 }
 
 Requires_Pkg_install(){
-	ComPkg=($@)
+	ComPkg=$@
         ## Requires check
 	for i in $ComPkg
 	do
-                echo "$BARR"
-                echo " You need to install the "$i" command. Let's try to install that package..."
-                echo "$BARR"
-                        case $OS_name in
-                                RHEL)
-                                        $sudo_base yum install -y $i 
-					exception_check
-				;;
-                                Ubuntu)
-                                        $sudo_base apt-get install -y $i
-					exception_check
-				;;
-                        esac
-		echo "Check Requires Packages"
 		if [ "$(type -p $i)" == "" ]
 		then
-			echo "$BARR"
-	                echo " You need to install the "$i" Package manually"
-               		echo "$BARR"
-                	exit 0
-		else
-			echo "Require Package path is "$(type -p $i)
+                	echo "$BARR"
+	                echo " You need to install the "$i" command. Let's try to install that package..."
+	                echo "$BARR"
+        	                case $OS_name in
+                	                RHEL)
+                        	                $sudo_base yum install -y $i 
+						exception_check
+					;;
+        	                        Ubuntu)
+                	                        $sudo_base apt-get install -y $i
+						exception_check
+					;;
+        	                esac
+			echo "Check Requires Packages"
+			if [ "$(type -p $i)" == "" ]
+			then
+				echo "$BARR"
+		                echo " You need to install the "$i" Package manually"
+       	        		echo "$BARR"
+	                	exit 0
+			else
+				echo "Require Package path is "$(type -p $i)
+			fi
 		fi
 	done
 }
@@ -913,8 +923,8 @@ AllPkgSortedResult="${BoxPkgArry[@]}"
 ############################# zinst re-org engine end ###################################
 
 ## Package Version making auto
-StableOptionCheck=`echo "${PackageArryOption[@]}" |grep "\-stable"`
-	CheckCommandX=`echo $CommandX |egrep "^i"`
+StableOptionCheck=$(echo "${PackageArryOption[@]}" |grep "\-stable")
+	CheckCommandX=$(echo $CommandX |egrep "^i")
 	if [[ $CheckCommandX != "" ]]
 	then
 		if [[ $StableOptionCheck != "" ]]
@@ -961,31 +971,34 @@ zinst set | awk 'NR>1{print "Package setting",$1}' >> $Save_Dir/$Naming
 
 Pkg_Install(){
 	CounterAll=1
-	while [[ $CounterAll -le $ProcessPkgNum ]]
+	#while [[ $CounterAll -le $ProcessPkgNum ]]
+	for i in $ZPackages
 	do
-		Package_list=`echo $ProcessPkg |awk '{print $'$CounterAll'}'`
-			if [[ `( echo "$Package_list" |grep "[a-z].*--" )` != "" ]];then
-				Package_list_conv=`echo "$Package_list" | sed -e 's/[a-z].*--//g'`
+#		Package_list=$(echo $ProcessPkg |awk '{print $'$CounterAll'}')
+		Package_list=$ZPackages
+			if [[ $( echo "$Package_list" |grep "[a-z].*--" ) != "" ]]
+			then
+				Package_list_conv=$(echo "$Package_list" | sed -e 's/[a-z].*--//g')
 				cp -vf $Package_list ./$Package_list_conv
 				Package_list=$Package_list_conv
 			fi
 
 		## Check the Package or Distribution server
-		Pkg_result=`cd $PWD;ls |grep "^$Package_list"`
+		Pkg_result=$(cd $PWD;ls |grep "^$Package_list")
 			if [[ $Pkg_result = "" ]];
 			then
 				DIST=$Dist_URL
 			else
-				DIST=`pwd`
+				DIST=$(pwd)
 			fi
 		############################## Install start without target host ##################################################
-		ZinstName=`echo "$Package_list" |awk -F "[.]zinst" '{print $1}'`
-		ZinstOrgName=`echo "$Package_list" |awk -F "-" '{print $1}'`
+		ZinstName=$(echo "$Package_list" |awk -F "[.]zinst" '{print $1}')
+		ZinstOrgName=$(echo "$Package_list" |awk -F "-" '{print $1}')
 
 			if [[ $Pkg_result != $Package_list ]]
 			then
 				###  check package by curl ###
-				Package_RC=`curl --head --silent $Dist_URL/$Package_list 2> $zinst_log | head -1`
+				Package_RC=$(curl --head --silent $Dist_URL/$Package_list 2> $zinst_log | head -1)
 			fi
 
 			#### check local zinst file
@@ -1003,7 +1016,7 @@ Pkg_Install(){
 	 			$sudo_base chmod g+w $ZinstBaseRoot/vault/Source/$ZinstName
 			fi
 
-			if [[ `(echo "$Package_RC" |egrep -i "not")` != "" ]]
+			if [[ $(echo "$Package_RC" |egrep -i "not") != "" ]]
 			then
 				echo "  "
 				echo "  $Package_list Package has not found."
@@ -1011,37 +1024,40 @@ Pkg_Install(){
 				exit 0;
 			fi
 		## Check a same version Package
-		Existed_pkg=`ls -l $ZinstDIRs 2> $zinst_log |grep ^l | grep "/$ZinstOrgName-" | awk  '{print $11}' | awk -F '/' '{print $NF}'`
-		Existed_pkg_version=`echo "$Existed_pkg" | awk -F'-' '{print $2}'`
-		Origin_pkg_version=`echo "$ZinstName" | awk -F'-' '{print $2}'`
+		Existed_pkg=$(ls -l $ZinstDIRs 2> $zinst_log |grep ^l | grep "/$ZinstOrgName-" | awk  '{print $NF}' | awk -F '/' '{print $NF}')
+		Existed_pkg_version=$(echo "$Existed_pkg" | awk -F'-' '{print $2}')
+		Origin_pkg_version=$(echo "$ZinstName" | awk -F'-' '{print $2}')
 		echo ""
 		echo ----- $Package_list -----
-			if [[ $(version_redefine $Origin_pkg_version) = $(version_redefine $Existed_pkg_version) ]];then
+			if [[ $(version_redefine $Origin_pkg_version) = $(version_redefine $Existed_pkg_version) ]]
+			then
 			#########  -same -live option check  ################
-				if [[ $PureOption != "-same" ]]
+				if [[ $SameOption != "--same" ]]
 				then
 					echo "$Barr"
 					echo "The Server has a same version of package already"
-					echo "Please insert an option like this \"-same\" if you want to install continue."
+					echo "Please insert an option like this \"--same\" if you want to install continue."
 					echo "$Barr"
 					exit 0;
 				fi
 			fi
 
-			if [[ $(version_redefine $Origin_pkg_version) < $(version_redefine $Existed_pkg_version) ]];then
+			if [[ $(version_redefine $Origin_pkg_version) < $(version_redefine $Existed_pkg_version) ]]
+			then
 			#########  -downgrade option check  ################
-				if [[ $PureOption != "-downgrade" ]]
+				if [[ $DowngradeOption != "-- downgrade" ]]
 				then
 					echo "$Barr"
 					echo "Your package is a older version then exists package version"
-					echo "Please insert an option like this \"-downgrade\" if you want to install continue."
+					echo "Please insert an option like this \"--downgrade\" if you want to install continue."
 					echo "$Barr"
 					exit 0;
 				fi
 			fi
 
 			#########  -oldset option check - when the package update -oldset option can apply old setup to new package ################
-			if [[ $Old_set_checker = "-oldset" ]];	then
+			if [[ $Old_set_checker = "-oldset" ]]
+			then
 				oldset=`zinst set |grep "$ZinstOrgName\." | sed -e 's/^/ -set /g' | xargs `
 				Zset="$Zset $oldset"
 			fi
@@ -1357,27 +1373,9 @@ Pkg_Install(){
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 Pkg_Remove(){
 
-
-
-
-ProcessPkg=($ZPackages)
+ProcessPkg=$ZPackages
 ProcessPkgNum=${#ProcessPkg[@]}
 	if [[ $ZPackages = "" ]]
 	then
@@ -2224,7 +2222,7 @@ sudo mkdir -p $CurrPkgDiR
                         else
                                 CheckSet=(`cat $CurrPkgDiR/${GetSPkgArry[$GetSCounter]}.zicf 2> $zinst_log |grep "^ZINST set " | sed -e 's/ZINST set //g' | awk '{for (i=2;i<=NF;i=i+1) print "'$PackageReal'."$1"="$i}'`)
                         fi
-
+	
         let GetSCounter=$GetSCounter+1
         done
 
@@ -2237,152 +2235,150 @@ sudo mkdir -p $CurrPkgDiR
 }
 
 
-
-
-
-
-
-
-
-
+########################################
+# Pkg_Set Using $Zset Argument 
+# $Zset Argument has been  include --set parameter 
 
 Pkg_Set () {
-for i in $Zset	
-do
-	SetTarget=$(echo "$i" | awk -F "=" '{print $1}')
-	ZinstSet=$(echo "$i" | sed -e "s#$SetTarget=##g" 2> $zinst_log)
-	OptSwt=$(echo $SetTarget | awk -F '.' '{print $1}')
-	Option=$(echo $SetTarget | sed -e "s#$OptSwt\.##g")
-	PackageS=$(echo $SetTarget | awk -F '.' '{print $1}')
-	SetZICF="*$PackageS.zicf"
-	echo "SetTarget :"$SetTarget
-	echo "ZinstSet :"$ZinstSet
-	echo "OptSwt :"$OptSwt
-	echo "Option :"$Option
-	echo "PackageS :"$PackageS
-	echo "SetZICF :"$SetZICF
+if [[ -z $Zset ]]
+then
+	$sudo_base cat $ZinstBaseRoot/vault/zinst/zinst_set.list
+else
+	for i in $Zset	
+	do
+		SetTarget=$(echo "$i" | awk -F "=" '{print $1}')
+		ZinstSet=$(echo "$i" | sed -e "s#$SetTarget=##g" 2> $zinst_log)
+		OptSwt=$(echo $SetTarget | awk -F '.' '{print $1}')
+		Option=$(echo $SetTarget | sed -e "s#$OptSwt\.##g")
+		PackageS=$(echo $SetTarget | awk -F '.' '{print $1}')
+		SetZICF="*$PackageS.zicf"
+		echo "SetTarget :"$SetTarget
+		echo "ZinstSet :"$ZinstSet
+		echo "OptSwt :"$OptSwt
+		echo "Option :"$Option
+		echo "PackageS :"$PackageS
+		echo "SetZICF :"$SetZICF
 
-	## Check a set list in zinst
-	CurrentSet=$($sudo_base cat $ZinstBaseRoot/vault/zinst/zinst_set.list | grep "^$SetTarget")
-	CurrentSetCheck=$(echo "$CurrentSet" | awk -F "=" '{print $1}')
-	CurrentSetCheck2=$(echo "$CurrentSet" | sed -e "s#$CurrentSetCheck=##g"  2> $zinst_log)
-	Setchecker=$(ls $ZinstDIRs 2> $zinst_log |grep "$PackageS")
-	echo "Setchecker :"$Setchecker
-	if [[ $Setchecker != ""  ]]
-	then
-	ConfCounter=0
-	Grep_ZICF_Raw=$($sudo_base cat $ZinstDIRs/$PackageS/$SetZICF |grep "^CONF" | awk '{print "'$ZinstDIRs/$PackageS'/"$6}' | sed -e 's#\.\/##g')
-		while [[ $ConfCounter -lt ${#Grep_ZICF_Raw[@]} ]]
-		do
-			if [[ $Option = "" ]] 
-			then
-				print_locale CODE_PKG02_$Zinst_Locale
-				exit 0
-			fi
-			## Find a current set
-			Grep_ZICF=$($sudo_base cat $ZinstDIRs/$PackageS/$SetZICF |grep "^CONF" | awk '{print "'$ZinstBaseRoot'/"$5}')
-			if [[ $Grep_ZICF = "" ]] 
-			then
-				echo "$Barr"
-				echo "$PackageS has not a config file as a zicf or we couldn't find any config"
-				echo "Please check this zicf file of the package."
-				echo ""
-				echo "ex) zinst list -zicf $PackageS | grep ^CONF <--- Result is empty."
-				echo " If so, you should change the file type from FILE to CONF "
-				echo "$Barr"
-				exit 0
-			fi
-			Conf_Dir=${Grep_ZICF_Raw[$ConfCounter]%/*}
-			echo "Conf_Dir is "$Conf_Dir
-			Grep_Option=$($sudo_base grep "^$Option=" $Conf_Dir/* 2> /dev/null)
-				if [[ $Grep_Option = "" ]]
+		## Check a set list in zinst
+		CurrentSet=$($sudo_base cat $ZinstBaseRoot/vault/zinst/zinst_set.list | grep "^$SetTarget")
+		CurrentSetCheck=$(echo "$CurrentSet" | awk -F "=" '{print $1}')
+		CurrentSetCheck2=$(echo "$CurrentSet" | sed -e "s#$CurrentSetCheck=##g"  2> $zinst_log)
+		Setchecker=$(ls $ZinstDIRs 2> $zinst_log |grep "$PackageS")
+		echo "Setchecker :"$Setchecker
+		if [[ $Setchecker != ""  ]]
+		then
+		ConfCounter=0
+		Grep_ZICF_Raw=$($sudo_base cat $ZinstDIRs/$PackageS/$SetZICF |grep "^CONF" | awk '{print "'$ZinstDIRs/$PackageS'/"$6}' | sed -e 's#\.\/##g')
+			while [[ $ConfCounter -lt ${#Grep_ZICF_Raw[@]} ]]
+			do
+				if [[ $Option = "" ]] 
 				then
-					Grep_Option=$($sudo_base grep "^$Option = " $Conf_Dir/* 2> /dev/null)
-					if [[ $Grep_Option = "" ]]
-					then
-						Grep_Option=$($sudo_base grep "^$Option " $Conf_Dir/* 2> /dev/null)
-					fi
+					print_locale CODE_PKG02_$Zinst_Locale
+					# Original Meesage is " It dose not existed target option"
+					exit 0
 				fi
-				## Parsing
-				Conf_File=${Grep_ZICF_Raw[$ConfCounter]%:*}
-				if [[ $CommandX = set ]] 
+				## Find a current set
+				Grep_ZICF=$($sudo_base cat $ZinstDIRs/$PackageS/$SetZICF |grep "^CONF" | awk '{print "'$ZinstBaseRoot'/"$5}')
+				if [[ $Grep_ZICF = "" ]] 
 				then
-					Command_p=" * setup "
-				else
-					Command_p=" & setup "
-                        	fi
-
-				Conf_Result_File=$(echo "$Conf_File" | awk -F '/' '{print $NF}')
-				Grep_ZICF_Source=$($sudo_base cat $ZinstDIRs/$PackageS/$SetZICF |grep "^CONF" |grep "$Conf_Result_File$" | awk '{print "'$ZinstBaseRoot'/"$5}')
-				### Current Setting check and replace
-				if [[ $SetTarget = $CurrentSetCheck ]]
-				then
-					Equiltype1=$($sudo_base grep "$Option=$CurrentSetCheck2" $Grep_ZICF_Source)
-					Equiltype2=$($sudo_base grep "$Option = $CurrentSetCheck2" $Grep_ZICF_Source)
-					Equiltype3=$($sudo_base grep "$Option $CurrentSetCheck2" $Grep_ZICF_Source)
-					if [[ $Equiltype1 != "" ]]
-					then
-						$sudo_base sed -i "s#$Option=$CurrentSetCheck2#$Option=$ZinstSet#g" $Grep_ZICF_Source
-						exception_check
-					elif [[ $Equiltype2 != "" ]]
-					then
-						$sudo_base sed -i "s#$Option = $CurrentSetCheck2#$Option = $ZinstSet#g" $Grep_ZICF_Source
-						exception_check
-					elif [[ $Equiltype3 != "" ]]
-					then
-						$sudo_base sed -i "s#$Option $CurrentSetCheck2#$Option $ZinstSet#g" $Grep_ZICF_Source
-						exception_check
-					fi
-					### Stamping a Set value for history
-					Grep_Option=$($sudo_base grep "^$Option=" $Grep_ZICF_Source)
+					echo "$Barr"
+					echo "$PackageS has not a config file as a zicf or we couldn't find any config"
+					echo "Please check this zicf file of the package."
+					echo ""
+					echo "ex) zinst list -zicf $PackageS | grep ^CONF <--- Result is empty."
+					echo " If so, you should change the file type from FILE to CONF "
+					echo "$Barr"
+					exit 0
+				fi
+				Conf_Dir=${Grep_ZICF_Raw[$ConfCounter]%/*}
+				echo "Conf_Dir is "$Conf_Dir
+				Grep_Option=$($sudo_base grep "^$Option=" $Conf_Dir/* 2> /dev/null)
 					if [[ $Grep_Option = "" ]]
 					then
-						Grep_Option=$($sudo_base grep "^$Option = " $Grep_ZICF_Source)
+						Grep_Option=$($sudo_base grep "^$Option = " $Conf_Dir/* 2> /dev/null)
 						if [[ $Grep_Option = "" ]]
 						then
-							Grep_Option=$($sudo_base grep "^$Option " $Grep_ZICF_Source)
+							Grep_Option=$($sudo_base grep "^$Option " $Conf_Dir/* 2> /dev/null)
 						fi
 					fi
-					realSetOption=$(echo "$Grep_Option"  | sed -e "s#$Option #$Option=#g" -e 's#== #=#g')
-					if [[ $realSetOption != "" ]]
+					## Parsing
+					Conf_File=${Grep_ZICF_Raw[$ConfCounter]%:*}
+					if [[ $CommandX = set ]] 
 					then
+						Command_p=" * setup "
+					else
+						Command_p=" & setup "
+	                        	fi
+					Conf_Result_File=$(echo "$Conf_File" | awk -F '/' '{print $NF}')
+					Grep_ZICF_Source=$($sudo_base cat $ZinstDIRs/$PackageS/$SetZICF |grep "^CONF" |grep "$Conf_Result_File$" | awk '{print "'$ZinstBaseRoot'/"$5}')
+					### Current Setting check and replace
+					if [[ $SetTarget = $CurrentSetCheck ]]
+					then
+						Equiltype1=$($sudo_base grep "$Option=$CurrentSetCheck2" $Grep_ZICF_Source)
+						Equiltype2=$($sudo_base grep "$Option = $CurrentSetCheck2" $Grep_ZICF_Source)
+						Equiltype3=$($sudo_base grep "$Option $CurrentSetCheck2" $Grep_ZICF_Source)
+						if [[ $Equiltype1 != "" ]]
+						then
+							$sudo_base sed -i "s#$Option=$CurrentSetCheck2#$Option=$ZinstSet#g" $Grep_ZICF_Source
+							exception_check
+						elif [[ $Equiltype2 != "" ]]
+						then
+							$sudo_base sed -i "s#$Option = $CurrentSetCheck2#$Option = $ZinstSet#g" $Grep_ZICF_Source
+							exception_check
+						elif [[ $Equiltype3 != "" ]]
+						then
+							$sudo_base sed -i "s#$Option $CurrentSetCheck2#$Option $ZinstSet#g" $Grep_ZICF_Source
+							exception_check
+						fi
+						### Stamping a Set value for history
+						Grep_Option=$($sudo_base grep "^$Option=" $Grep_ZICF_Source)
+						if [[ $Grep_Option = "" ]]
+						then
+							Grep_Option=$($sudo_base grep "^$Option = " $Grep_ZICF_Source)
+							if [[ $Grep_Option = "" ]]
+							then
+								Grep_Option=$($sudo_base grep "^$Option " $Grep_ZICF_Source)
+							fi
+						fi
+						realSetOption=$(echo "$Grep_Option"  | sed -e "s#$Option #$Option=#g" -e 's#== #=#g')
+						if [[ $realSetOption != "" ]]
+						then
 							$sudo_base sed -i "/$SetTarget=/d" $ZinstBaseRoot/vault/zinst/zinst_set.list
 							exception_check
 							echo "$PackageS.$realSetOption" >> $ZinstBaseRoot/vault/zinst/zinst_set.list
+						fi
 					fi
-				fi
-			let ConfCounter=$ConfCounter+1
-		done
+				let ConfCounter=$ConfCounter+1
+			done
 
-		$sudo_base cat  $ZinstBaseRoot/vault/zinst/zinst_set.list |grep "^$SetTarget="
-		exception_check
-		echo -e "`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - $i" >> $History_LOG
-
-		if [[ $SetTarget != $CurrentSetCheck ]]	
-		then
-			### Cancel Setup when it meet th Empty result
-			if [[ $Grep_Option = "" ]]
-			then
-				print_locale CODE_PKG02_$Zinst_Locale
-				exit 0
-			fi
-			## Remove temporary 2015.03.06
-			# echo "$i" >> $ZinstBaseRoot/vault/zinst/zinst_set.list
+			$sudo_base cat  $ZinstBaseRoot/vault/zinst/zinst_set.list |grep "^$SetTarget="
+			exception_check
 			echo -e "`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - $i" >> $History_LOG
+
+			if [[ $SetTarget != $CurrentSetCheck ]]	
+			then
+				### Cancel Setup when it meet th Empty result
+				if [[ $Grep_Option = "" ]]
+				then
+					print_locale CODE_PKG02_$Zinst_Locale
+					exit 0
+				fi
+				## Remove temporary 2015.03.06
+				# echo "$i" >> $ZinstBaseRoot/vault/zinst/zinst_set.list
+				echo -e "`date +%Y.%m.%d_%T`\t $WhoStamps : $Command_p - $i" >> $History_LOG
+			fi
+		else
+			print_locale CODE_PKG01_$Zinst_Locale 
 		fi
-	else
-		print_locale CODE_PKG01_$Zinst_Locale 
-	fi
-done
-Save_Restore_file $*
+	done
+	Save_Restore_file $*
+fi
 }
 
 
 ##############################################################
 ####################  Main Function Below ####################
 ##############################################################
-
-
 
 OS_Checker
 System_Controller_checker	
@@ -2423,8 +2419,11 @@ then
 	WhoStamp=$(whoami)
 fi
 
-$sudo_base rm $ZinstBaseRoot/src/_tmp_acc 2> $zinst_log
-exception_check
+if [ -e $ZinstBaseRoot/src/_tmp_acc ] 
+then
+	$sudo_base rm $ZinstBaseRoot/src/_tmp_acc 2> $zinst_log
+	exception_check
+fi
 export ZinstDir=$ZinstBaseRoot
 CurrPkgDiR=$(echo $ZinstBaseRoot"/vault/zinst/index")
 WhoStamps=$(printf "%-14s" "$WhoStamp")
@@ -2447,12 +2446,14 @@ $sudo_base chgrp $zinst_group $History_LOG 2> $zinst_log
 
 
 ### Multi file copier command
-	if [[ $CommandX = "mcp" ]]; then
-		if [[ $ZHosts != "" ]];	then
-			TargetDir=`echo $ZPackages | awk '{print $NF}'`
-			Source=`echo $ZPackages | awk '{for (i=1;i<NF;i=i+1) print $i}'`
-			SourceNum=`echo $Source | awk '{print NF}' `
-			HostNum=`echo $ZHosts | awk '{print NF}'`
+	if [[ $CommandX = "mcp" ]] 
+	then
+		if [[ $ZHosts != "" ]]
+		then
+			TargetDir=$(echo $ZPackages | awk '{print $NF}')
+			Source=$(echo $ZPackages | awk '{for (i=1;i<NF;i=i+1) print $i}')
+			SourceNum=$(echo $Source | awk '{print NF}')
+			HostNum=$(echo $ZHosts | awk '{print NF}')
 			Hcount=1
 				while [[ $Hcount -le $HostNum ]]
 				do
@@ -2460,7 +2461,8 @@ $sudo_base chgrp $zinst_group $History_LOG 2> $zinst_log
 					echo ""
 					echo "[:: $TartgetHost  ::]"
 					Scount=1
-						while [[ $Scount -le $SourceNum ]];	do
+						while [[ $Scount -le $SourceNum ]]i
+						do
 							PartedSource=`echo $Source |awk '{print $'$Scount'}'`
 							Check_Files=`ls $PartedSource`
 								if [[ $Check_Files != $PartedSource  ]]
@@ -2673,7 +2675,7 @@ RotaBeacon=0
 
 case "$command" in
 	i | inst*)
-		#Pkg_Install $* 	
+		Pkg_Install $* 	
 		echo "command [ install ] package is "$@
 		echo $ProcessPkgNum
 		echo $ZHosts
@@ -2682,18 +2684,10 @@ case "$command" in
 		echo ${#SetOptionValue[@]}
 	;;
 	set)
-		#echo $Zset $@
-		Zset=$Zset" "$@
-		echo "before Pkg_Set function "
 		Pkg_Set
-		echo "command [ set ] argument is "$@
-		#echo $ProcessPkgNum
-		#echo $ZHosts
-		#echo $HostCount
-		#echo ${#SetOptionValue[@]}
 	;;
 	gets*)
-		#Pkg_Getset $*
+		Pkg_Getset $*
 		echo "command ["$command"] argument is "$@
 	;;
 	getd*)
@@ -2701,7 +2695,7 @@ case "$command" in
 		echo "command ["$command"] argument is "$@
 	;;
 	r*m*)
-		#Pkg_Remove $*	
+		Pkg_Remove $*	
 		echo "command ["$command"] argument is "$@
 	;;
 	start)
@@ -2749,7 +2743,7 @@ case "$command" in
 		echo "command ["$command"] argument is "$@
 	;;
 	l*s*)
-		#Pkg_List $*	
+		Pkg_List $*	
 		echo "command ["$command"] argument is "$@
 	;;
 	sync*)
